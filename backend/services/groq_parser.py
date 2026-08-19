@@ -74,3 +74,36 @@ Important instructions:
 
 Resume Text:
 {raw_text}"""
+
+def _call_groq(client:Groq, system_prompt:str, user_prompt:str)->str:
+
+    response=client.chat.completions.create(
+        model=GROQ_MODEL, 
+        messages=[
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt}
+        ],
+        temperature=0.0,
+        max_tokens=4096
+    )
+
+    return response.choices[0].message.content.strip()
+
+def _try_parse_json(text: str) -> dict | None:
+
+    # Strip markdown code fences if present
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+
+        # Remove opening fence (```json or ```)
+        first_newline = cleaned.index("\n") if "\n" in cleaned else len(cleaned)
+        cleaned = cleaned[first_newline + 1:]
+        # Remove closing fence
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
