@@ -205,3 +205,55 @@ def _validate_jd_result(result: dict) -> dict:
 
     return result
 
+#to make sure the parse json has all the valid json fields
+def _validate_resume_result(result: dict) -> dict:
+
+    defaults = {
+        "name": "",
+        "email": None,
+        "phone": None,
+        "linkedin": None,
+        "github": None,
+        "professional_summary": "",
+        "skills": [],
+        "experience": [],
+        "education": [],
+        "certifications": [],
+        "projects": [],
+        "action_verbs": [],
+        "keywords": [],
+    }
+    for key, default in defaults.items():
+        if key not in result or result[key] is None:
+            result[key] = default
+            
+        # Ensure list fields are actually lists
+        if isinstance(default, list) and not isinstance(result[key], list):
+            result[key] = default
+
+    #Validate experience entries
+    for exp in result.get("experience", []):
+        if not isinstance(exp, dict):
+            continue
+        exp.setdefault("job_title", "")
+        exp.setdefault("company", "")
+        exp.setdefault("start_date", "")
+        exp.setdefault("end_date", "")
+        exp.setdefault("duration_months", 0)
+        exp.setdefault("description", "")
+        #Ensure duration_months is an int
+        try:
+            exp["duration_months"] = int(exp["duration_months"])
+        except (ValueError, TypeError):
+            exp["duration_months"] = 0
+
+    #Validate project entries
+    for proj in result.get("projects", []):
+        if not isinstance(proj, dict):
+            continue
+        proj.setdefault("title", "")
+        proj.setdefault("description", "")
+        proj.setdefault("technologies", [])
+
+    return result
+
