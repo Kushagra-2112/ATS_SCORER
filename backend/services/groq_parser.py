@@ -160,3 +160,48 @@ Important instructions:
 Job Description Text:
 {raw_text}"""
 
+def parse_job_description(raw_text: str) -> Dict:
+    client = _get_client()
+    prompt = JD_USER_PROMPT.format(raw_text=raw_text)
+
+    raw_response = _call_groq(client, JD_SYSTEM_PROMPT, prompt)
+    result = _try_parse_json(raw_response)
+    if result is not None:
+        return _validate_jd_result(result)
+
+    logger.warning("Groq JD parse: first attempt returned invalid JSON, retrying...")
+    strict_prompt = (
+        "Your previous response was not valid JSON. "
+        "Return ONLY the raw JSON object, no markdown, no explanation, no code fences.\n\n"
+        + prompt
+    )
+    raw_response = _call_groq(client, JD_SYSTEM_PROMPT, strict_prompt)
+    result = _try_parse_json(raw_response)
+    if result is not None:
+        return _validate_jd_result(result)
+
+    raise ValueError(
+        f"Groq returned unparseable response after retry. Raw response:\n{raw_response[:500]}"
+    )
+
+#it will make sure, that the parse json has all the valid fields we expect
+def _validate_jd_result(result: dict) -> dict:
+    
+    defaults = {
+        "job_title": "",
+        "required_skills": [],
+        "preferred_skills": [],
+        "experience_required": "",
+        "education_required": "",
+        "key_responsibilities": [],
+        "keywords": [],
+    }
+
+    for key, default in defaults.items():
+        if key not in result or result[key] is None:
+            result[key] = default
+        if isinstance(default, list) and not isinstance(result[key], list):
+            result[key] = default
+
+    return result
+
