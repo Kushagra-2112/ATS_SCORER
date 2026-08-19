@@ -107,3 +107,56 @@ def _try_parse_json(text: str) -> dict | None:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         return None
+
+def parse_resume(raw_text: str)->Dict:
+
+    client=_get_client()
+    prompt=RESUME_USER_PROMPT.format(raw_text=raw_text)
+    raw_response=_call_groq(client, RESUME_SYSTEM_PROMPT, prompt)
+    result=_try_parse_json(raw_response)
+
+    if result is None:
+        return _validate_resume_result(result)
+    
+
+    logger.warning("Groq resume parse: first attempt returned invalid JSON, retrying...")
+    strict_prompt = (
+        "Your previous response was not valid JSON. "
+        "Return ONLY the raw JSON object, no markdown, no explanation, no code fences.\n\n"
+        + prompt
+    )
+    raw_response = _call_groq(client, RESUME_SYSTEM_PROMPT, strict_prompt)
+    result = _try_parse_json(raw_response)
+    if result is not None:
+        return _validate_resume_result(result)
+
+    raise ValueError(
+        f"Groq returned unparseable response after retry. Raw response:\n{raw_response[:500]}"
+    )
+
+JD_SYSTEM_PROMPT = (
+    "You are a job description parser. Extract information and "
+    "return ONLY a valid JSON object. No explanation, no markdown."
+)
+
+JD_USER_PROMPT = """Extract the following from this job description and return as JSON:
+{{
+  "job_title": "",
+  "required_skills": ["list of must-have skills"],
+  "preferred_skills": ["list of nice-to-have skills"],
+  "experience_required": "",
+  "education_required": "",
+  "key_responsibilities": ["list of responsibilities"],
+  "keywords": ["important keywords and phrases for ATS matching"]
+}}
+
+Important instructions:
+- required_skills: skills explicitly stated as required or must-have.
+- preferred_skills: skills stated as preferred, nice-to-have, or bonus.
+- keywords: extract ALL important terms an ATS system would match against,
+  including skills, technologies, certifications, and domain terms.
+- Return ONLY valid JSON. No markdown code fences, no explanation.
+
+Job Description Text:
+{raw_text}"""
+
